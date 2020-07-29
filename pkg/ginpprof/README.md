@@ -33,7 +33,7 @@ func main() {
 	// group := router.Group("/debug/pprof")
 	// ginpprof.WrapGroup(group)
 
-	router.Run(":8080")
+	router.Run(":57047")
 }
 ```
 
@@ -55,6 +55,12 @@ Start this server, and you will see such outputs:
 [GIN-debug] Listening and serving HTTP on :8080
 ```
 
-Now visit [http://127.0.0.1:8080/debug/pprof/](http://127.0.0.1:8080/debug/pprof/) and you'll see what you want.
+Now visit [http://127.0.0.1:57047/debug/pprof/](http://127.0.0.1:57047/debug/pprof/) and you'll see what you want.
 
 Have Fun.
+
+
+1. `while true; do date '+%Y-%m-%d %H:%M:%S'; ps aux | grep gologdemo | grep -v grep | grep -v tail; sleep 10; done`
+1. `go tool pprof -http=:8080 http://127.0.0.1:57047/debug/pprof/profile`
+1. `go tool pprof -http=:8080 http://127.0.0.1:57047/debug/pprof/heap`
+
