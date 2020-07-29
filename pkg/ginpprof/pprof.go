@@ -1,6 +1,7 @@
 package ginpprof
 
 import (
+	"fmt"
 	"net/http/pprof"
 	"strings"
 
@@ -8,8 +9,14 @@ import (
 )
 
 // Wrap adds several routes from package `net/http/pprof` to *gin.Engine object
-func Wrap(router *gin.Engine) {
-	WrapGroup(&router.RouterGroup)
+func Wrap(router interface{}) {
+	if r, ok := router.(*gin.Engine); ok {
+		WrapGroup(&r.RouterGroup)
+	} else if r, ok := router.(*gin.RouterGroup); ok {
+		WrapGroup(r)
+	} else {
+		panic(fmt.Errorf("please wrap *gin.Engine or *gin.RouterGroup"))
+	}
 }
 
 // WrapGroup adds several routes from package `net/http/pprof` to *gin.RouterGroup object
