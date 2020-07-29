@@ -2,6 +2,7 @@ package ginpprof
 
 import (
 	"fmt"
+	"net/http"
 	"net/http/pprof"
 	"strings"
 
@@ -14,6 +15,8 @@ func Wrap(router interface{}) {
 		WrapGroup(&r.RouterGroup)
 	} else if r, ok := router.(*gin.RouterGroup); ok {
 		WrapGroup(r)
+	} else if r, ok := router.(*http.ServeMux); ok {
+		WrapServeMux(r)
 	} else {
 		panic(fmt.Errorf("please wrap *gin.Engine or *gin.RouterGroup"))
 	}
@@ -39,6 +42,22 @@ func WrapGroup(router *gin.RouterGroup) {
 	}
 }
 
+// WrapServeMux adds several routes from package `net/http/pprof` to *http.ServeMux object
+func WrapServeMux(mux *http.ServeMux) {
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+}
+
 var routers = []struct {
 	Method  string
 	Path    string
@@ -46,21 +65,6 @@ var routers = []struct {
 }{
 	{"GET", "/debug/pprof/", func(c *gin.Context) {
 		pprof.Index(c.Writer, c.Request)
-	}},
-	{"GET", "/debug/pprof/heap", func(c *gin.Context) {
-		pprof.Handler("heap").ServeHTTP(c.Writer, c.Request)
-	}},
-	{"GET", "/debug/pprof/goroutine", func(c *gin.Context) {
-		pprof.Handler("goroutine").ServeHTTP(c.Writer, c.Request)
-	}},
-	{"GET", "/debug/pprof/allocs", func(c *gin.Context) {
-		pprof.Handler("allocs").ServeHTTP(c.Writer, c.Request)
-	}},
-	{"GET", "/debug/pprof/block", func(c *gin.Context) {
-		pprof.Handler("block").ServeHTTP(c.Writer, c.Request)
-	}},
-	{"GET", "/debug/pprof/threadcreate", func(c *gin.Context) {
-		pprof.Handler("threadcreate").ServeHTTP(c.Writer, c.Request)
 	}},
 	{"GET", "/debug/pprof/cmdline", func(c *gin.Context) {
 		pprof.Cmdline(c.Writer, c.Request)
@@ -76,6 +80,21 @@ var routers = []struct {
 	}},
 	{"GET", "/debug/pprof/trace", func(c *gin.Context) {
 		pprof.Trace(c.Writer, c.Request)
+	}},
+	{"GET", "/debug/pprof/heap", func(c *gin.Context) {
+		pprof.Handler("heap").ServeHTTP(c.Writer, c.Request)
+	}},
+	{"GET", "/debug/pprof/goroutine", func(c *gin.Context) {
+		pprof.Handler("goroutine").ServeHTTP(c.Writer, c.Request)
+	}},
+	{"GET", "/debug/pprof/allocs", func(c *gin.Context) {
+		pprof.Handler("allocs").ServeHTTP(c.Writer, c.Request)
+	}},
+	{"GET", "/debug/pprof/block", func(c *gin.Context) {
+		pprof.Handler("block").ServeHTTP(c.Writer, c.Request)
+	}},
+	{"GET", "/debug/pprof/threadcreate", func(c *gin.Context) {
+		pprof.Handler("threadcreate").ServeHTTP(c.Writer, c.Request)
 	}},
 	{"GET", "/debug/pprof/mutex", func(c *gin.Context) {
 		pprof.Handler("mutex").ServeHTTP(c.Writer, c.Request)
