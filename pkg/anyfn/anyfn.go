@@ -16,18 +16,34 @@ type AdapterDealer interface {
 type Adapter struct {
 }
 
-type anyfn struct {
-	v interface{}
+type BeforeArounder interface {
+	// Do will be called Before the adaptee invoking.
+	Do(args []interface{}) error
 }
 
-func F(v interface{}) *anyfn {
-	return &anyfn{v: v}
+type AfterArounder interface {
+	// Do will be called Before the adaptee invoking.
+	Do(args []interface{}, results []interface{}) error
 }
 
-var Type = reflect.TypeOf((*anyfn)(nil))
+type AnyF struct {
+	F      interface{}
+	Before BeforeArounder
+	After  AfterArounder
+}
+
+func F(v interface{}) *AnyF {
+	return &AnyF{F: v}
+}
+
+func F3(v interface{}, before BeforeArounder, after AfterArounder) *AnyF {
+	return &AnyF{F: v, Before: before, After: after}
+}
+
+var AnyFType = reflect.TypeOf((*AnyF)(nil))
 
 func (a *Adapter) Support(arg interface{}) bool {
-	return reflect.TypeOf(arg) == Type
+	return reflect.TypeOf(arg) == AnyFType
 }
 
 func NewAdapter() *Adapter {
@@ -37,25 +53,60 @@ func NewAdapter() *Adapter {
 }
 
 func (a *Adapter) Adapt(argV interface{}) gin.HandlerFunc {
-	arg := argV.(*anyfn).v
-	fv := reflect.ValueOf(arg)
+	anyF := argV.(*AnyF)
+	fv := reflect.ValueOf(anyF.F)
 
 	return func(c *gin.Context) {
-		if err := a.internalAdapter(c, fv); err != nil {
+		if err := a.internalAdapter(c, fv, anyF); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("error: %s", err))
 		}
 	}
 }
 
-func (a *Adapter) internalAdapter(c *gin.Context, fv reflect.Value) error {
+func (a *Adapter) internalAdapter(c *gin.Context, fv reflect.Value, anyF *AnyF) error {
 	argVs, err := a.createArgs(c, fv)
 	if err != nil {
 		return err
 	}
 
+	if err := a.before(argVs, anyF.Before); err != nil {
+		return err
+	}
+
 	r := fv.Call(argVs)
 
+	if err := a.after(argVs, r, anyF.After); err != nil {
+		return err
+	}
+
 	return a.processOut(c, fv, r)
+}
+
+func (a *Adapter) before(v []reflect.Value, f BeforeArounder) error {
+	if f == nil {
+		return nil
+	}
+
+	return f.Do(Values(v).Interface())
+}
+
+func (a *Adapter) after(v, results []reflect.Value, f AfterArounder) error {
+	if f == nil {
+		return nil
+	}
+
+	return f.Do(Values(v).Interface(), Values(results).Interface())
+}
+
+type Values []reflect.Value
+
+func (v Values) Interface() []interface{} {
+	args := make([]interface{}, len(v))
+	for i, a := range v {
+		args[i] = a.Interface()
+	}
+
+	return args
 }
 
 func (a *Adapter) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value) error {
