@@ -1,4 +1,4 @@
-package anyfunc
+package anyfn
 
 import (
 	"fmt"
@@ -16,15 +16,15 @@ type AdapterDealer interface {
 type Adapter struct {
 }
 
-type anyFunc struct {
+type anyfn struct {
 	v interface{}
 }
 
-func F(v interface{}) *anyFunc {
-	return &anyFunc{v: v}
+func F(v interface{}) *anyfn {
+	return &anyfn{v: v}
 }
 
-var Type = reflect.TypeOf((*anyFunc)(nil))
+var Type = reflect.TypeOf((*anyfn)(nil))
 
 func (a *Adapter) Support(arg interface{}) bool {
 	return reflect.TypeOf(arg) == Type
@@ -37,7 +37,7 @@ func NewAdapter() *Adapter {
 }
 
 func (a *Adapter) Adapt(argV interface{}) gin.HandlerFunc {
-	arg := argV.(*anyFunc).v
+	arg := argV.(*anyfn).v
 	fv := reflect.ValueOf(arg)
 
 	return func(c *gin.Context) {

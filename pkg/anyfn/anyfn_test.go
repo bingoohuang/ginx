@@ -1,4 +1,4 @@
-package anyfunc_test
+package anyfn_test
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
-	"github.com/bingoohuang/ginx/pkg/anyfunc"
+	"github.com/bingoohuang/ginx/pkg/anyfn"
 	"github.com/bingoohuang/ginx/pkg/gintest"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +16,8 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-func TestAdaptAnyFunc(t *testing.T) {
-	adapter := anyfunc.NewAdapter()
+func TestAdaptanyfn(t *testing.T) {
+	adapter := anyfn.NewAdapter()
 
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(func(f func(string) string) gin.HandlerFunc {
@@ -36,11 +36,11 @@ func TestAdaptAnyFunc(t *testing.T) {
 		Name string
 	}
 
-	r.POST("/MyObject1", anyfunc.F(func(m MyObject) string {
+	r.POST("/MyObject1", anyfn.F(func(m MyObject) string {
 		return "Object: " + m.Name
 	}))
 
-	r.POST("/MyObject2", anyfunc.F(func(m *MyObject) string {
+	r.POST("/MyObject2", anyfn.F(func(m *MyObject) string {
 		return "Object: " + m.Name
 	}))
 

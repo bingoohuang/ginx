@@ -1,11 +1,11 @@
-package anyfunc_test
+package anyfn_test
 
 import (
 	"errors"
 	"testing"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
-	"github.com/bingoohuang/ginx/pkg/anyfunc"
+	"github.com/bingoohuang/ginx/pkg/anyfn"
 	"github.com/bingoohuang/ginx/pkg/gintest"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -13,13 +13,13 @@ import (
 
 func TestDirect(t *testing.T) {
 	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfunc.NewAdapter())
+	r.RegisterAdapter(anyfn.NewAdapter())
 
-	r.GET("/direct1", anyfunc.F(func() interface{} {
-		return anyfunc.DirectResponse{Code: 203}
+	r.GET("/direct1", anyfn.F(func() interface{} {
+		return anyfn.DirectResponse{Code: 203}
 	}))
-	r.GET("/direct2", anyfunc.F(func() interface{} {
-		return &anyfunc.DirectResponse{Code: 201, Error: errors.New("abc")}
+	r.GET("/direct2", anyfn.F(func() interface{} {
+		return &anyfn.DirectResponse{Code: 201, Error: errors.New("abc")}
 	}))
 
 	rr := gintest.Get("/direct1", r)

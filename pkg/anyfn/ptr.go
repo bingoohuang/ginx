@@ -1,4 +1,4 @@
-package anyfunc
+package anyfn
 
 import "reflect"
 

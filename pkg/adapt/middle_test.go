@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
-	"github.com/bingoohuang/ginx/pkg/anyfunc"
+	"github.com/bingoohuang/ginx/pkg/anyfn"
 	"github.com/bingoohuang/ginx/pkg/gintest"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ type AuthUser struct {
 
 func TestMiddleware(t *testing.T) {
 	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfunc.NewAdapter())
+	r.RegisterAdapter(anyfn.NewAdapter())
 
 	r.Use(func(c *gin.Context) {
 		c.Set("AuthUser", AuthUser{Name: "TestAuthUser"})
@@ -27,7 +27,7 @@ func TestMiddleware(t *testing.T) {
 
 func TestMiddlewarePtr(t *testing.T) {
 	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfunc.NewAdapter())
+	r.RegisterAdapter(anyfn.NewAdapter())
 
 	r.Use(func(c *gin.Context) {
 		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
@@ -37,16 +37,16 @@ func TestMiddlewarePtr(t *testing.T) {
 }
 
 func doTest(t *testing.T, r *adapt.Adaptee) {
-	r.GET("/GetAge1/:name", anyfunc.F(func(user AuthUser, name string) string {
+	r.GET("/GetAge1/:name", anyfn.F(func(user AuthUser, name string) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge2/:name", anyfunc.F(func(name string, user AuthUser) string {
+	r.GET("/GetAge2/:name", anyfn.F(func(name string, user AuthUser) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge3/:name", anyfunc.F(func(user *AuthUser, name string) string {
+	r.GET("/GetAge3/:name", anyfn.F(func(user *AuthUser, name string) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge4/:name", anyfunc.F(func(name string, user *AuthUser) string {
+	r.GET("/GetAge4/:name", anyfn.F(func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
 	}))
 

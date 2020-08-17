@@ -1,10 +1,10 @@
-package anyfunc_test
+package anyfn_test
 
 import (
 	"testing"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
-	"github.com/bingoohuang/ginx/pkg/anyfunc"
+	"github.com/bingoohuang/ginx/pkg/anyfn"
 	"github.com/bingoohuang/ginx/pkg/gintest"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -12,10 +12,10 @@ import (
 
 func TestDl(t *testing.T) {
 	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfunc.NewAdapter())
+	r.RegisterAdapter(anyfn.NewAdapter())
 
-	r.GET("/dl", anyfunc.F(func() anyfunc.DlFile {
-		return anyfunc.DlFile{DiskFile: "testdata/hello.txt"}
+	r.GET("/dl", anyfn.F(func() anyfn.DlFile {
+		return anyfn.DlFile{DiskFile: "testdata/hello.txt"}
 	}))
 
 	rr := gintest.Get("/dl", r)

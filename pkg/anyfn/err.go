@@ -1,4 +1,4 @@
-package anyfunc
+package anyfn
 
 // AdapterError defines the error generated in the processing of adaptor.
 type AdapterError struct {
