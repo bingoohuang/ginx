@@ -58,6 +58,38 @@ func WrapServeMux(mux *http.ServeMux) {
 	mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
 }
 
+// PprofServeHTTP servces HTTP requests for /debug/pprof requests.
+func PprofServeHTTP(w http.ResponseWriter, r *http.Request) bool {
+	switch r.URL.Path {
+	case "/debug/pprof":
+		pprof.Index(w, r)
+	case "/debug/pprof/cmdline":
+		pprof.Cmdline(w, r)
+	case "/debug/pprof/symbol":
+		pprof.Symbol(w, r)
+	case "/debug/pprof/profile":
+		pprof.Profile(w, r)
+	case "/debug/pprof/trace":
+		pprof.Trace(w, r)
+	case "/debug/pprof/heap":
+		pprof.Handler("heap").ServeHTTP(w, r)
+	case "/debug/pprof/goroutine":
+		pprof.Handler("goroutine").ServeHTTP(w, r)
+	case "/debug/pprof/allocs":
+		pprof.Handler("allocs").ServeHTTP(w, r)
+	case "/debug/pprof/block":
+		pprof.Handler("block").ServeHTTP(w, r)
+	case "/debug/pprof/threadcreate":
+		pprof.Handler("threadcreate").ServeHTTP(w, r)
+	case "/debug/pprof/mutex":
+		pprof.Handler("mutex").ServeHTTP(w, r)
+	default:
+		return false
+	}
+
+	return true
+}
+
 var routers = []struct {
 	Method  string
 	Path    string
