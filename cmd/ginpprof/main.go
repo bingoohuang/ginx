@@ -11,24 +11,45 @@ import (
 )
 
 func main() {
-	router := gin.Default()
-
-	router.GET("/ping", func(c *gin.Context) {
+	r := gin.Default()
+	r.Use(gin.Logger())
+	r.GET("/ping", func(c *gin.Context) {
 		c.String(200, "pong")
 	})
 
 	// automatically add routers for net/http/pprof
 	// e.g. /debug/pprof, /debug/pprof/heap, etc.
-	ginpprof.Wrap(router)
+	ginpprof.Wrap(r)
+
+	// Authorization group
+	// authorized := r.Group("/", AuthRequired())
+	// exactly the same as:
+	authorized := r.Group("/")
+	// per group middleware! in this case we use the custom created
+	// AuthRequired() middleware just in the "authorized" group.
+	authorized.Use(AuthRequired())
+	{
+		authorized.POST("/login", func(c *gin.Context) {})
+		authorized.POST("/submit", func(c *gin.Context) {})
+		authorized.POST("/read", func(c *gin.Context) {})
+
+		// nested group
+		testing := authorized.Group("/testing")
+		testing.GET("/analytics", func(c *gin.Context) {})
+	}
 
 	// ginpprof also plays well with *gin.RouterGroup
-	// group := router.Group("/debug/pprof")
+	// group := r.Group("/debug/pprof")
 	// ginpprof.WrapGroup(group)
 
 	addr := FreeAddr()
 	fmt.Println("start to listen on", addr)
 
-	panic(router.Run(addr))
+	panic(r.Run(addr))
+}
+
+func AuthRequired() gin.HandlerFunc {
+	return nil
 }
 
 // FreeAddr asks the kernel for a free open port that is ready to use.
