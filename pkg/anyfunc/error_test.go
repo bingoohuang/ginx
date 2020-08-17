@@ -15,9 +15,9 @@ func TestError(t *testing.T) {
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(anyfunc.NewAdapter())
 
-	r.Any("/error", anyfunc.Fn(func() error { return errors.New("error occurred") }))
-	r.GET("/ok", anyfunc.Fn(func() error { return nil }))
-	r.GET("/url", anyfunc.Fn(func(c *gin.Context) (string, error) { return c.Request.URL.String(), nil }))
+	r.Any("/error", anyfunc.F(func() error { return errors.New("error occurred") }))
+	r.GET("/ok", anyfunc.F(func() error { return nil }))
+	r.GET("/url", anyfunc.F(func(c *gin.Context) (string, error) { return c.Request.URL.String(), nil }))
 
 	rr := gintest.Get("/error", r)
 	assert.Equal(t, 500, rr.StatusCode())

@@ -83,15 +83,19 @@ func (a *Adaptee) createHandlerFuncs(args []interface{}) []gin.HandlerFunc {
 }
 
 func (a *Adaptee) adapt(arg interface{}) gin.HandlerFunc {
-	if f, ok := arg.(gin.HandlerFunc); ok {
+	if f := a.findAdapterFunc(arg); f != nil {
 		return f
 	}
 
-	if fn := a.findAdapterFunc(arg); fn != nil {
-		return fn
+	if f := a.findAdapter(arg); f != nil {
+		return f
 	}
 
-	return a.findAdapter(arg)
+	if v := reflect.ValueOf(arg); v.Type().ConvertibleTo(ginHandlerFuncType) {
+		return v.Convert(ginHandlerFuncType).Interface().(gin.HandlerFunc)
+	}
+
+	return nil
 }
 
 func (a *Adaptee) findAdapterFunc(arg interface{}) gin.HandlerFunc {

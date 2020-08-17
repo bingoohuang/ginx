@@ -14,7 +14,7 @@ func TestDl(t *testing.T) {
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(anyfunc.NewAdapter())
 
-	r.GET("/dl", anyfunc.Fn(func() anyfunc.DlFile {
+	r.GET("/dl", anyfunc.F(func() anyfunc.DlFile {
 		return anyfunc.DlFile{DiskFile: "testdata/hello.txt"}
 	}))
 

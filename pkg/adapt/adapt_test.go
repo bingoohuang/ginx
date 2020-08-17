@@ -39,10 +39,18 @@ func TestAdapt(t *testing.T) {
 		return fmt.Sprintf("Hello %s", name)
 	})
 
+	// This handler will match /user/john but will not match /user/ or /user
+	r.GET("/direct/:name", func(c *gin.Context) {
+		c.String(http.StatusOK, "Hello Direct %s", c.Param("name"))
+	})
+
 	// r.Run(":8080")
 
 	rr := gintest.Get("/user/bingoohuang", r)
 	assert.Equal(t, "Hello bingoohuang", rr.Body())
+
+	rr = gintest.Get("/direct/bingoohuang", r)
+	assert.Equal(t, "Hello Direct bingoohuang", rr.Body())
 }
 
 func StringArg(c *gin.Context) string {

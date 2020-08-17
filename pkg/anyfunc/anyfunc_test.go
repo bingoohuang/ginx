@@ -36,11 +36,11 @@ func TestAdaptAnyFunc(t *testing.T) {
 		Name string
 	}
 
-	r.POST("/MyObject1", anyfunc.Fn(func(m MyObject) string {
+	r.POST("/MyObject1", anyfunc.F(func(m MyObject) string {
 		return "Object: " + m.Name
 	}))
 
-	r.POST("/MyObject2", anyfunc.Fn(func(m *MyObject) string {
+	r.POST("/MyObject2", anyfunc.F(func(m *MyObject) string {
 		return "Object: " + m.Name
 	}))
 

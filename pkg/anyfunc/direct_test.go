@@ -15,10 +15,10 @@ func TestDirect(t *testing.T) {
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(anyfunc.NewAdapter())
 
-	r.GET("/direct1", anyfunc.Fn(func() interface{} {
+	r.GET("/direct1", anyfunc.F(func() interface{} {
 		return anyfunc.DirectResponse{Code: 203}
 	}))
-	r.GET("/direct2", anyfunc.Fn(func() interface{} {
+	r.GET("/direct2", anyfunc.F(func() interface{} {
 		return &anyfunc.DirectResponse{Code: 201, Error: errors.New("abc")}
 	}))
 

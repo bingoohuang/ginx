@@ -20,7 +20,7 @@ type anyFunc struct {
 	v interface{}
 }
 
-func Fn(v interface{}) *anyFunc {
+func F(v interface{}) *anyFunc {
 	return &anyFunc{v: v}
 }
 
