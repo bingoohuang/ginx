@@ -9,8 +9,8 @@ import (
 )
 
 type Adapter interface {
-	Support(interface{}) bool
-	Adapt(arg interface{}) gin.HandlerFunc
+	Support(relativePath string, arg interface{}) bool
+	Adapt(relativePath string, arg interface{}) gin.HandlerFunc
 }
 
 type Adaptee struct {
@@ -34,11 +34,11 @@ func (i *adapterFuncItem) invoke(adapteeFn interface{}) gin.HandlerFunc {
 	return result[0].Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)
 }
 
-func (a *Adaptee) createHandlerFuncs(args []interface{}) []gin.HandlerFunc {
+func (a *Adaptee) createHandlerFuncs(relativePath string, args []interface{}) []gin.HandlerFunc {
 	hfs := make([]gin.HandlerFunc, 0, len(args))
 
 	for _, arg := range args {
-		if hf := a.adapt(arg); hf != nil {
+		if hf := a.adapt(relativePath, arg); hf != nil {
 			hfs = append(hfs, hf)
 		}
 	}
@@ -46,12 +46,12 @@ func (a *Adaptee) createHandlerFuncs(args []interface{}) []gin.HandlerFunc {
 	return hfs
 }
 
-func (a *Adaptee) adapt(arg interface{}) gin.HandlerFunc {
+func (a *Adaptee) adapt(relativePath string, arg interface{}) gin.HandlerFunc {
 	if f := a.findAdapterFunc(arg); f != nil {
 		return f
 	}
 
-	if f := a.findAdapter(arg); f != nil {
+	if f := a.findAdapter(relativePath, arg); f != nil {
 		return f
 	}
 
@@ -74,10 +74,10 @@ func (a *Adaptee) findAdapterFunc(arg interface{}) gin.HandlerFunc {
 	return nil
 }
 
-func (a *Adaptee) findAdapter(arg interface{}) gin.HandlerFunc {
+func (a *Adaptee) findAdapter(relativePath string, arg interface{}) gin.HandlerFunc {
 	for _, v := range a.adapters {
-		if v.Support(arg) {
-			return v.Adapt(arg)
+		if v.Support(relativePath, arg) {
+			return v.Adapt(relativePath, arg)
 		}
 	}
 
@@ -128,39 +128,39 @@ func (a *Adaptee) Use(f func(c *gin.Context)) {
 }
 
 func (a *Adaptee) Any(relativePath string, args ...interface{}) {
-	a.Router.Any(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.Any(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) POST(relativePath string, args ...interface{}) {
-	a.Router.POST(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.POST(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) GET(relativePath string, args ...interface{}) {
-	a.Router.GET(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.GET(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) DELETE(relativePath string, args ...interface{}) {
-	a.Router.DELETE(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) PUT(relativePath string, args ...interface{}) {
-	a.Router.PUT(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.PUT(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) PATCH(relativePath string, args ...interface{}) {
-	a.Router.PATCH(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.PATCH(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) OPTIONS(relativePath string, args ...interface{}) {
-	a.Router.OPTIONS(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) HEAD(relativePath string, args ...interface{}) {
-	a.Router.HEAD(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.HEAD(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *Adaptee) Group(relativePath string, args ...interface{}) *AdapteeGroup {
-	g := a.Router.Group(relativePath, a.createHandlerFuncs(args)...)
+	g := a.Router.Group(relativePath, a.createHandlerFuncs(relativePath, args)...)
 	return &AdapteeGroup{
 		Adaptee:     a,
 		RouterGroup: g,
@@ -177,33 +177,33 @@ func (a *AdapteeGroup) Use(f func(c *gin.Context)) {
 }
 
 func (a *AdapteeGroup) Any(relativePath string, args ...interface{}) {
-	a.RouterGroup.Any(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.Any(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) POST(relativePath string, args ...interface{}) {
-	a.RouterGroup.POST(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.POST(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) GET(relativePath string, args ...interface{}) {
-	a.RouterGroup.GET(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.GET(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) DELETE(relativePath string, args ...interface{}) {
-	a.Router.DELETE(relativePath, a.createHandlerFuncs(args)...)
+	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) PUT(relativePath string, args ...interface{}) {
-	a.RouterGroup.PUT(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.PUT(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) PATCH(relativePath string, args ...interface{}) {
-	a.RouterGroup.PATCH(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.PATCH(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) OPTIONS(relativePath string, args ...interface{}) {
-	a.RouterGroup.OPTIONS(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }
 
 func (a *AdapteeGroup) HEAD(relativePath string, args ...interface{}) {
-	a.RouterGroup.HEAD(relativePath, a.createHandlerFuncs(args)...)
+	a.RouterGroup.HEAD(relativePath, a.createHandlerFuncs(relativePath, args)...)
 }

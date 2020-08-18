@@ -16,6 +16,12 @@ type AdapterDealer interface {
 type Adapter struct {
 }
 
+func NewAdapter() *Adapter {
+	adapter := &Adapter{}
+
+	return adapter
+}
+
 type Before interface {
 	// Do will be called Before the adaptee invoking.
 	Do(args []interface{}) error
@@ -50,17 +56,11 @@ func F3(v interface{}, before Before, after After) *AnyF {
 
 var AnyFType = reflect.TypeOf((*AnyF)(nil))
 
-func (a *Adapter) Support(arg interface{}) bool {
+func (a *Adapter) Support(relativePath string, arg interface{}) bool {
 	return reflect.TypeOf(arg) == AnyFType
 }
 
-func NewAdapter() *Adapter {
-	adapter := &Adapter{}
-
-	return adapter
-}
-
-func (a *Adapter) Adapt(argV interface{}) gin.HandlerFunc {
+func (a *Adapter) Adapt(relativePath string, argV interface{}) gin.HandlerFunc {
 	anyF := argV.(*AnyF)
 	fv := reflect.ValueOf(anyF.F)
 
