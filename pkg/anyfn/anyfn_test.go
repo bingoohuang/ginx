@@ -16,7 +16,7 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-func TestAdaptanyfn(t *testing.T) {
+func TestAnyFn(t *testing.T) {
 	adapter := anyfn.NewAdapter()
 
 	r := adapt.Adapt(gin.New())
@@ -53,6 +53,20 @@ func TestAdaptanyfn(t *testing.T) {
 	assert.Equal(t, "Object: bingoo", rr.Body())
 	rr = gintest.Post("/MyObject2", r, gintest.JSONVar(MyObject{Name: "bingoo2"}))
 	assert.Equal(t, "Object: bingoo2", rr.Body())
+}
+
+func TestAnyFnHttpRequest(t *testing.T) {
+	adapter := anyfn.NewAdapter()
+
+	r := adapt.Adapt(gin.New())
+	r.RegisterAdapter(adapter)
+
+	r.POST("/http", anyfn.F(func(w http.ResponseWriter, r *http.Request) string {
+		return "Object: " + r.URL.String()
+	}))
+
+	rr := gintest.Post("/http", r)
+	assert.Equal(t, "Object: /http", rr.Body())
 }
 
 func StringArg(c *gin.Context) string {

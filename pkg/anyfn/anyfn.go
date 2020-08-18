@@ -191,13 +191,18 @@ func (a *Adapter) createArgs(c *gin.Context, fv reflect.Value) (v []reflect.Valu
 }
 
 func (a *Adapter) createArgValue(c *gin.Context, arg argIn, singleArgValue string) (reflect.Value, error) {
-	if arg.Kind == reflect.Struct {
+	switch arg.Kind {
+	case reflect.Struct:
 		v, err := a.processStruct(c, arg)
 		if err != nil {
 			return reflect.Value{}, err
 		}
 
 		return ConvertPtr(arg.Ptr, v), nil
+	case reflect.Interface:
+		if arg.Type == HTTPResponseWriterType {
+			return reflect.ValueOf(c.Writer), nil
+		}
 	}
 
 	if arg.PrimitiveIndex < 0 {
@@ -211,9 +216,19 @@ func (a *Adapter) createArgValue(c *gin.Context, arg argIn, singleArgValue strin
 	return reflect.Zero(arg.Type), nil
 }
 
+var (
+	GinContextType         = reflect.TypeOf((*gin.Context)(nil)).Elem()
+	HTTPRequestType        = reflect.TypeOf((*http.Request)(nil)).Elem()
+	HTTPResponseWriterType = reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
+)
+
 func (a *Adapter) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
-	if arg.Ptr && arg.Type == NonPtrTypeOf(c) { // 直接注入gin.Context
+	if arg.Ptr && arg.Type == GinContextType { // 直接注入gin.Context
 		return reflect.ValueOf(c), nil
+	}
+
+	if arg.Ptr && arg.Type == HTTPRequestType {
+		return reflect.ValueOf(c.Request), nil
 	}
 
 	for _, v := range c.Keys {

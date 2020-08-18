@@ -31,7 +31,96 @@ type Gin interface {
 func (i *adapterFuncItem) invoke(adapteeFn interface{}) gin.HandlerFunc {
 	args := []reflect.Value{reflect.ValueOf(adapteeFn)}
 	result := i.adapterFunc.Call(args)
-	return result[0].Convert(ginHandlerFuncType).Interface().(gin.HandlerFunc)
+	return result[0].Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)
+}
+
+func (a *Adaptee) createHandlerFuncs(args []interface{}) []gin.HandlerFunc {
+	hfs := make([]gin.HandlerFunc, 0, len(args))
+
+	for _, arg := range args {
+		if hf := a.adapt(arg); hf != nil {
+			hfs = append(hfs, hf)
+		}
+	}
+
+	return hfs
+}
+
+func (a *Adaptee) adapt(arg interface{}) gin.HandlerFunc {
+	if f := a.findAdapterFunc(arg); f != nil {
+		return f
+	}
+
+	if f := a.findAdapter(arg); f != nil {
+		return f
+	}
+
+	if v := reflect.ValueOf(arg); v.Type().ConvertibleTo(GinHandlerFuncType) {
+		return v.Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)
+	}
+
+	return nil
+}
+
+func (a *Adaptee) findAdapterFunc(arg interface{}) gin.HandlerFunc {
+	argType := reflect.TypeOf(arg)
+
+	for funcType, funcItem := range a.adapterFuncs {
+		if argType.ConvertibleTo(funcType) {
+			return funcItem.invoke(arg)
+		}
+	}
+
+	return nil
+}
+
+func (a *Adaptee) findAdapter(arg interface{}) gin.HandlerFunc {
+	for _, v := range a.adapters {
+		if v.Support(arg) {
+			return v.Adapt(arg)
+		}
+	}
+
+	return nil
+}
+
+func Adapt(router *gin.Engine) *Adaptee {
+	return &Adaptee{
+		Router:       router,
+		adapterFuncs: make(map[reflect.Type]*adapterFuncItem),
+	}
+}
+
+func (a *Adaptee) ServeHTTP(r http.ResponseWriter, w *http.Request) {
+	a.Router.ServeHTTP(r, w)
+}
+
+var GinHandlerFuncType = reflect.TypeOf(gin.HandlerFunc(nil))
+
+func (a *Adaptee) RegisterAdapter(adapter interface{}) {
+	if v, ok := adapter.(Adapter); ok {
+		a.adapters = append(a.adapters, v)
+		return
+	}
+
+	adapterValue := reflect.ValueOf(adapter)
+	t := adapterValue.Type()
+
+	if t.Kind() != reflect.Func {
+		panic(fmt.Errorf("register method should use a func"))
+	}
+
+	if t.NumIn() != 1 || t.In(0).Kind() != reflect.Func {
+		panic(fmt.Errorf("register method should use a func which inputs a func"))
+	}
+
+	if t.NumOut() != 1 || !t.Out(0).ConvertibleTo(GinHandlerFuncType) {
+		panic(fmt.Errorf("register method should use a func which returns gin.HandlerFunc"))
+	}
+
+	a.adapterFuncs[t.In(0)] = &adapterFuncItem{
+		adapterFunc: adapterValue,
+	}
 }
 
 func (a *Adaptee) Use(f func(c *gin.Context)) {
@@ -68,93 +157,4 @@ func (a *Adaptee) OPTIONS(relativePath string, args ...interface{}) {
 
 func (a *Adaptee) HEAD(relativePath string, args ...interface{}) {
 	a.Router.HEAD(relativePath, a.createHandlerFuncs(args)...)
-}
-
-func (a *Adaptee) createHandlerFuncs(args []interface{}) []gin.HandlerFunc {
-	hfs := make([]gin.HandlerFunc, 0, len(args))
-
-	for _, arg := range args {
-		if hf := a.adapt(arg); hf != nil {
-			hfs = append(hfs, hf)
-		}
-	}
-
-	return hfs
-}
-
-func (a *Adaptee) adapt(arg interface{}) gin.HandlerFunc {
-	if f := a.findAdapterFunc(arg); f != nil {
-		return f
-	}
-
-	if f := a.findAdapter(arg); f != nil {
-		return f
-	}
-
-	if v := reflect.ValueOf(arg); v.Type().ConvertibleTo(ginHandlerFuncType) {
-		return v.Convert(ginHandlerFuncType).Interface().(gin.HandlerFunc)
-	}
-
-	return nil
-}
-
-func (a *Adaptee) findAdapterFunc(arg interface{}) gin.HandlerFunc {
-	argType := reflect.TypeOf(arg)
-
-	for funcType, funcItem := range a.adapterFuncs {
-		if argType.ConvertibleTo(funcType) {
-			return funcItem.invoke(arg)
-		}
-	}
-
-	return nil
-}
-
-func (a *Adaptee) findAdapter(arg interface{}) gin.HandlerFunc {
-	for _, adapter := range a.adapters {
-		if adapter.Support(arg) {
-			return adapter.Adapt(arg)
-		}
-	}
-
-	return nil
-}
-
-func Adapt(router *gin.Engine) *Adaptee {
-	return &Adaptee{
-		Router:       router,
-		adapterFuncs: make(map[reflect.Type]*adapterFuncItem),
-	}
-}
-
-func (a *Adaptee) ServeHTTP(r http.ResponseWriter, w *http.Request) {
-	a.Router.ServeHTTP(r, w)
-}
-
-var ginHandlerFuncType = reflect.TypeOf(gin.HandlerFunc(nil))
-
-func (a *Adaptee) RegisterAdapter(adapter interface{}) {
-	if v, ok := adapter.(Adapter); ok {
-		a.adapters = append(a.adapters, v)
-		return
-	}
-
-	adapterValue := reflect.ValueOf(adapter)
-	t := adapterValue.Type()
-
-	if t.Kind() != reflect.Func {
-		panic(fmt.Errorf("register method should use a func"))
-	}
-
-	if t.NumIn() != 1 || t.In(0).Kind() != reflect.Func {
-		panic(fmt.Errorf("register method should use a func which inputs a func"))
-	}
-
-	if t.NumOut() != 1 || !t.Out(0).ConvertibleTo(ginHandlerFuncType) {
-		panic(fmt.Errorf("register method should use a func which returns gin.HandlerFunc"))
-	}
-
-	a.adapterFuncs[t.In(0)] = &adapterFuncItem{
-		adapterFunc: adapterValue,
-	}
 }
