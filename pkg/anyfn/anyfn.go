@@ -16,27 +16,35 @@ type AdapterDealer interface {
 type Adapter struct {
 }
 
-type BeforeArounder interface {
+type Before interface {
 	// Do will be called Before the adaptee invoking.
 	Do(args []interface{}) error
 }
 
-type AfterArounder interface {
+type BeforeFn func(args []interface{}) error
+
+func (b BeforeFn) Do(args []interface{}) error { return b(args) }
+
+type After interface {
 	// Do will be called Before the adaptee invoking.
 	Do(args []interface{}, results []interface{}) error
 }
 
+type AfterFn func(args []interface{}, results []interface{}) error
+
+func (b AfterFn) Do(args []interface{}, results []interface{}) error { return b(args, results) }
+
 type AnyF struct {
 	F      interface{}
-	Before BeforeArounder
-	After  AfterArounder
+	Before Before
+	After  After
 }
 
 func F(v interface{}) *AnyF {
 	return &AnyF{F: v}
 }
 
-func F3(v interface{}, before BeforeArounder, after AfterArounder) *AnyF {
+func F3(v interface{}, before Before, after After) *AnyF {
 	return &AnyF{F: v, Before: before, After: after}
 }
 
@@ -82,7 +90,7 @@ func (a *Adapter) internalAdapter(c *gin.Context, fv reflect.Value, anyF *AnyF) 
 	return a.processOut(c, fv, r)
 }
 
-func (a *Adapter) before(v []reflect.Value, f BeforeArounder) error {
+func (a *Adapter) before(v []reflect.Value, f Before) error {
 	if f == nil {
 		return nil
 	}
@@ -90,7 +98,7 @@ func (a *Adapter) before(v []reflect.Value, f BeforeArounder) error {
 	return f.Do(Values(v).Interface())
 }
 
-func (a *Adapter) after(v, results []reflect.Value, f AfterArounder) error {
+func (a *Adapter) after(v, results []reflect.Value, f After) error {
 	if f == nil {
 		return nil
 	}

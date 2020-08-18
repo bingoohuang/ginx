@@ -69,6 +69,36 @@ func TestAnyFnHttpRequest(t *testing.T) {
 	assert.Equal(t, "Object: /http", rr.Body())
 }
 
+func TestAnyFnAround(t *testing.T) {
+	adapter := anyfn.NewAdapter()
+
+	r := adapt.Adapt(gin.New())
+	r.RegisterAdapter(adapter)
+
+	beforeTag := ""
+	afterTag := ""
+
+	r.POST("/http", anyfn.F3(func(w http.ResponseWriter, r *http.Request) string {
+		return beforeTag + r.URL.String()
+	}, anyfn.BeforeFn(func(args []interface{}) error {
+		_ = args[0].(http.ResponseWriter)
+		_ = args[1].(*http.Request)
+
+		beforeTag = "BeforeFn: "
+		return nil
+	}), anyfn.AfterFn(func(args []interface{}, results []interface{}) error {
+		_ = args[0].(http.ResponseWriter)
+		_ = args[1].(*http.Request)
+
+		afterTag = results[0].(string)
+		return nil
+	})))
+
+	rr := gintest.Post("/http", r)
+	assert.Equal(t, "BeforeFn: /http", rr.Body())
+	assert.Equal(t, "BeforeFn: /http", afterTag)
+}
+
 func StringArg(c *gin.Context) string {
 	if len(c.Params) == 1 {
 		return c.Params[0].Value

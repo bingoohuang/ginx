@@ -11,6 +11,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNoAdapt(t *testing.T) {
+	r := gin.New()
+
+	// This handler will match /user/john but will not match /user/ or /user
+	r.GET("/user/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		c.String(http.StatusOK, "Hello %s", name)
+	})
+
+	// r.Run(":8080")
+
+	rr := gintest.Get("/user/bingoohuang", r)
+	assert.Equal(t, "Hello bingoohuang", rr.Body())
+}
+
 func TestAdapt(t *testing.T) {
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(func(f func(string) string) gin.HandlerFunc {
@@ -36,21 +51,6 @@ func TestAdapt(t *testing.T) {
 
 	rr = gintest.Get("/direct/bingoohuang", r)
 	assert.Equal(t, "Hello Direct bingoohuang", rr.Body())
-}
-
-func TestBeforeAdapt(t *testing.T) {
-	r := gin.New()
-
-	// This handler will match /user/john but will not match /user/ or /user
-	r.GET("/user/:name", func(c *gin.Context) {
-		name := c.Param("name")
-		c.String(http.StatusOK, "Hello %s", name)
-	})
-
-	// r.Run(":8080")
-
-	rr := gintest.Get("/user/bingoohuang", r)
-	assert.Equal(t, "Hello bingoohuang", rr.Body())
 }
 
 func TestGroup(t *testing.T) {
