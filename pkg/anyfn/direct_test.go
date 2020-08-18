@@ -19,7 +19,7 @@ func TestDirect(t *testing.T) {
 		return anyfn.DirectResponse{Code: 203}
 	}))
 	r.GET("/direct2", anyfn.F(func() interface{} {
-		return &anyfn.DirectResponse{Code: 201, Error: errors.New("abc")}
+		return &anyfn.DirectResponse{Error: errors.New("abc")}
 	}))
 	r.GET("/direct3", anyfn.F(func() interface{} {
 		return &anyfn.DirectResponse{String: "ABC"}
@@ -40,7 +40,7 @@ func TestDirect(t *testing.T) {
 	assert.Equal(t, "", rr.Body())
 
 	rr = gintest.Get("/direct2", r)
-	assert.Equal(t, 201, rr.StatusCode())
+	assert.Equal(t, 500, rr.StatusCode())
 	assert.Equal(t, "abc", rr.Body())
 
 	rr = gintest.Get("/direct3", r)

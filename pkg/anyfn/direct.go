@@ -18,7 +18,11 @@ type DirectResponse struct {
 
 func (d DirectResponse) Deal(c *gin.Context) {
 	if d.Code == 0 {
-		d.Code = http.StatusOK
+		if d.Error != nil {
+			d.Code = http.StatusInternalServerError
+		} else {
+			d.Code = http.StatusOK
+		}
 	}
 
 	if d.ContentType != "" {
