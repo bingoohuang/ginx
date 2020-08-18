@@ -11,21 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBeforeAdapt(t *testing.T) {
-	r := gin.New()
-
-	// This handler will match /user/john but will not match /user/ or /user
-	r.GET("/user/:name", func(c *gin.Context) {
-		name := c.Param("name")
-		c.String(http.StatusOK, "Hello %s", name)
-	})
-
-	// r.Run(":8080")
-
-	rr := gintest.Get("/user/bingoohuang", r)
-	assert.Equal(t, "Hello bingoohuang", rr.Body())
-}
-
 func TestAdapt(t *testing.T) {
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(func(f func(string) string) gin.HandlerFunc {
@@ -51,6 +36,43 @@ func TestAdapt(t *testing.T) {
 
 	rr = gintest.Get("/direct/bingoohuang", r)
 	assert.Equal(t, "Hello Direct bingoohuang", rr.Body())
+}
+
+func TestBeforeAdapt(t *testing.T) {
+	r := gin.New()
+
+	// This handler will match /user/john but will not match /user/ or /user
+	r.GET("/user/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		c.String(http.StatusOK, "Hello %s", name)
+	})
+
+	// r.Run(":8080")
+
+	rr := gintest.Get("/user/bingoohuang", r)
+	assert.Equal(t, "Hello bingoohuang", rr.Body())
+}
+
+func TestGroup(t *testing.T) {
+	r := adapt.Adapt(gin.New())
+
+	r.RegisterAdapter(func(f func(string) string) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.String(http.StatusOK, f(StringArg(c)))
+		}
+	})
+
+	v1 := r.Group("/v1")
+	v1.POST("/login", func(user string) string { return "Hello1 " + user })
+
+	v2 := r.Group("/v2")
+	v2.POST("/login", func(user string) string { return "Hello2 " + user })
+
+	rr := gintest.Post("/v1/login", r, gintest.Query("user", "bingoohuang"))
+	assert.Equal(t, "Hello1 bingoohuang", rr.Body())
+
+	rr = gintest.Post("/v2/login", r, gintest.Query("user", "dingoohuang"))
+	assert.Equal(t, "Hello2 dingoohuang", rr.Body())
 }
 
 func StringArg(c *gin.Context) string {

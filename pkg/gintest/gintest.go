@@ -20,13 +20,24 @@ func Post(target string, router http.Handler, fns ...VarsFn) *Response {
 
 // from https://github.com/gin-gonic/gin/issues/1120
 func Request(method, target string, router http.Handler, fns ...VarsFn) *Response {
-	vars := &Vars{}
+	vars := &Vars{
+		Query: make(map[string]string),
+	}
 
 	for _, fn := range fns {
 		fn(vars)
 	}
 
 	r := httptest.NewRequest(method, target, vars.Body)
+
+	if len(vars.Query) > 0 {
+		q := r.URL.Query()
+		for k, v := range vars.Query {
+			q.Add(k, v)
+		}
+
+		r.URL.RawQuery = q.Encode()
+	}
 
 	if vars.ContentType != "" {
 		r.Header.Set("Content-Type", vars.ContentType)
@@ -60,9 +71,16 @@ func (r *Response) StatusCode() int {
 type Vars struct {
 	Body        io.Reader
 	ContentType string
+	Query       map[string]string
 }
 
 type VarsFn func(r *Vars)
+
+func Query(k, v string) VarsFn {
+	return func(r *Vars) {
+		r.Query[k] = v
+	}
+}
 
 func JSONVar(s interface{}) VarsFn {
 	switch v := s.(type) {

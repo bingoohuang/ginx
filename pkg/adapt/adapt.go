@@ -24,7 +24,7 @@ type adapterFuncItem struct {
 }
 
 type Gin interface {
-	gin.IRoutes
+	gin.IRouter
 	http.Handler
 }
 
@@ -157,4 +157,53 @@ func (a *Adaptee) OPTIONS(relativePath string, args ...interface{}) {
 
 func (a *Adaptee) HEAD(relativePath string, args ...interface{}) {
 	a.Router.HEAD(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *Adaptee) Group(relativePath string, args ...interface{}) *AdapteeGroup {
+	g := a.Router.Group(relativePath, a.createHandlerFuncs(args)...)
+	return &AdapteeGroup{
+		Adaptee:     a,
+		RouterGroup: g,
+	}
+}
+
+type AdapteeGroup struct {
+	*Adaptee
+	*gin.RouterGroup
+}
+
+func (a *AdapteeGroup) Use(f func(c *gin.Context)) {
+	a.RouterGroup.Use(f)
+}
+
+func (a *AdapteeGroup) Any(relativePath string, args ...interface{}) {
+	a.RouterGroup.Any(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) POST(relativePath string, args ...interface{}) {
+	a.RouterGroup.POST(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) GET(relativePath string, args ...interface{}) {
+	a.RouterGroup.GET(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) DELETE(relativePath string, args ...interface{}) {
+	a.Router.DELETE(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) PUT(relativePath string, args ...interface{}) {
+	a.RouterGroup.PUT(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) PATCH(relativePath string, args ...interface{}) {
+	a.RouterGroup.PATCH(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) OPTIONS(relativePath string, args ...interface{}) {
+	a.RouterGroup.OPTIONS(relativePath, a.createHandlerFuncs(args)...)
+}
+
+func (a *AdapteeGroup) HEAD(relativePath string, args ...interface{}) {
+	a.RouterGroup.HEAD(relativePath, a.createHandlerFuncs(args)...)
 }
