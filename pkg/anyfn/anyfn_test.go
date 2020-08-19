@@ -17,15 +17,14 @@ func init() {
 }
 
 func TestAnyFn(t *testing.T) {
-	adapter := anyfn.NewAdapter()
-
 	r := adapt.Adapt(gin.New())
 	r.RegisterAdapter(func(f func(string) string) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			c.String(http.StatusOK, f(StringArg(c)))
 		}
 	})
-	r.RegisterAdapter(adapter)
+	af := anyfn.NewAdapter()
+	r.RegisterAdapter(af)
 
 	// This handler will match /user/john but will not match /user/ or /user
 	r.GET("/user/:name", func(name string) string {
@@ -36,11 +35,11 @@ func TestAnyFn(t *testing.T) {
 		Name string
 	}
 
-	r.POST("/MyObject1", anyfn.F(func(m MyObject) string {
+	r.POST("/MyObject1", af.F(func(m MyObject) string {
 		return "Object: " + m.Name
 	}))
 
-	r.POST("/MyObject2", anyfn.F(func(m *MyObject) string {
+	r.POST("/MyObject2", af.F(func(m *MyObject) string {
 		return "Object: " + m.Name
 	}))
 
@@ -56,12 +55,11 @@ func TestAnyFn(t *testing.T) {
 }
 
 func TestAnyFnHttpRequest(t *testing.T) {
-	adapter := anyfn.NewAdapter()
+	af := anyfn.NewAdapter()
 
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(adapter)
+	r := adapt.Adapt(gin.New(), af)
 
-	r.POST("/http", anyfn.F(func(w http.ResponseWriter, r *http.Request) string {
+	r.POST("/http", af.F(func(w http.ResponseWriter, r *http.Request) string {
 		return "Object: " + r.URL.String()
 	}))
 
@@ -70,29 +68,27 @@ func TestAnyFnHttpRequest(t *testing.T) {
 }
 
 func TestAnyFnAround(t *testing.T) {
-	adapter := anyfn.NewAdapter()
-
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(adapter)
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
 	beforeTag := ""
 	afterTag := ""
 
-	r.POST("/http", anyfn.F3(func(w http.ResponseWriter, r *http.Request) string {
+	r.POST("/http", af.F(func(w http.ResponseWriter, r *http.Request) string {
 		return beforeTag + r.URL.String()
-	}, anyfn.BeforeFn(func(args []interface{}) error {
+	}, af.Before(anyfn.BeforeFn(func(args []interface{}) error {
 		_ = args[0].(http.ResponseWriter)
 		_ = args[1].(*http.Request)
 
 		beforeTag = "BeforeFn: "
 		return nil
-	}), anyfn.AfterFn(func(args []interface{}, results []interface{}) error {
+	})), af.After(anyfn.AfterFn(func(args []interface{}, results []interface{}) error {
 		_ = args[0].(http.ResponseWriter)
 		_ = args[1].(*http.Request)
 
 		afterTag = results[0].(string)
 		return nil
-	})))
+	}))))
 
 	rr := gintest.Post("/http", r)
 	assert.Equal(t, "BeforeFn: /http", rr.Body())

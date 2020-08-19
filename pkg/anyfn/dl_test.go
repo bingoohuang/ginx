@@ -11,10 +11,10 @@ import (
 )
 
 func TestDl(t *testing.T) {
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfn.NewAdapter())
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
-	r.GET("/dl", anyfn.F(func() anyfn.DlFile {
+	r.GET("/dl", af.F(func() anyfn.DlFile {
 		return anyfn.DlFile{DiskFile: "testdata/hello.txt"}
 	}))
 

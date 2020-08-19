@@ -12,19 +12,19 @@ import (
 )
 
 func TestDirect(t *testing.T) {
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfn.NewAdapter())
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
-	r.GET("/direct1", anyfn.F(func() interface{} {
+	r.GET("/direct1", af.F(func() interface{} {
 		return anyfn.DirectResponse{Code: 203}
 	}))
-	r.GET("/direct2", anyfn.F(func() interface{} {
+	r.GET("/direct2", af.F(func() interface{} {
 		return &anyfn.DirectResponse{Error: errors.New("abc")}
 	}))
-	r.GET("/direct3", anyfn.F(func() interface{} {
+	r.GET("/direct3", af.F(func() interface{} {
 		return &anyfn.DirectResponse{String: "ABC"}
 	}))
-	r.GET("/direct4", anyfn.F(func() interface{} {
+	r.GET("/direct4", af.F(func() interface{} {
 		return &anyfn.DirectResponse{
 			JSON: struct {
 				Name string `json:"name"`

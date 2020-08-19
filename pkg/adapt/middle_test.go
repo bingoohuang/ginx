@@ -15,38 +15,38 @@ type AuthUser struct {
 }
 
 func TestMiddleware(t *testing.T) {
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfn.NewAdapter())
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
 	r.Use(func(c *gin.Context) {
 		c.Set("AuthUser", AuthUser{Name: "TestAuthUser"})
 	})
 
-	doTest(t, r)
+	doTest(t, r, af)
 }
 
 func TestMiddlewarePtr(t *testing.T) {
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfn.NewAdapter())
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
 	r.Use(func(c *gin.Context) {
 		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
 	})
 
-	doTest(t, r)
+	doTest(t, r, af)
 }
 
-func doTest(t *testing.T, r *adapt.Adaptee) {
-	r.GET("/GetAge1/:name", anyfn.F(func(user AuthUser, name string) string {
+func doTest(t *testing.T, r *adapt.Adaptee, af *anyfn.Adapter) {
+	r.GET("/GetAge1/:name", af.F(func(user AuthUser, name string) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge2/:name", anyfn.F(func(name string, user AuthUser) string {
+	r.GET("/GetAge2/:name", af.F(func(name string, user AuthUser) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge3/:name", anyfn.F(func(user *AuthUser, name string) string {
+	r.GET("/GetAge3/:name", af.F(func(user *AuthUser, name string) string {
 		return user.Name + "/" + name
 	}))
-	r.GET("/GetAge4/:name", anyfn.F(func(name string, user *AuthUser) string {
+	r.GET("/GetAge4/:name", af.F(func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
 	}))
 

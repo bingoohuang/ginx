@@ -12,12 +12,12 @@ import (
 )
 
 func TestError(t *testing.T) {
-	r := adapt.Adapt(gin.New())
-	r.RegisterAdapter(anyfn.NewAdapter())
+	af := anyfn.NewAdapter()
+	r := adapt.Adapt(gin.New(), af)
 
-	r.Any("/error", anyfn.F(func() error { return errors.New("error occurred") }))
-	r.GET("/ok", anyfn.F(func() error { return nil }))
-	r.GET("/url", anyfn.F(func(c *gin.Context) (string, error) { return c.Request.URL.String(), nil }))
+	r.Any("/error", af.F(func() error { return errors.New("error occurred") }))
+	r.GET("/ok", af.F(func() error { return nil }))
+	r.GET("/url", af.F(func(c *gin.Context) (string, error) { return c.Request.URL.String(), nil }))
 
 	rr := gintest.Get("/error", r)
 	assert.Equal(t, 500, rr.StatusCode())

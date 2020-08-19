@@ -16,7 +16,10 @@ func TestNoAdapt(t *testing.T) {
 
 	// This handler will match /user/john but will not match /user/ or /user
 	r.GET("/user/:name", func(c *gin.Context) {
+		c.Set("Xyz", "First")
+	}, func(c *gin.Context) {
 		name := c.Param("name")
+		c.Header("Xyz", c.GetString("Xyz")+" Second")
 		c.String(http.StatusOK, "Hello %s", name)
 	})
 
@@ -24,6 +27,7 @@ func TestNoAdapt(t *testing.T) {
 
 	rr := gintest.Get("/user/bingoohuang", r)
 	assert.Equal(t, "Hello bingoohuang", rr.Body())
+	assert.Equal(t, "First Second", rr.Header().Get("Xyz"))
 }
 
 func TestAdapt(t *testing.T) {

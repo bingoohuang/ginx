@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/bingoohuang/ginx/pkg/adapt"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,7 +15,41 @@ type AdapterDealer interface {
 	Deal(*gin.Context)
 }
 
+type Interceptor interface {
+	StartRequest(path string, c *gin.Context, attrs map[string]interface{}) *gin.Context
+	EndRequest()
+}
+
 type Adapter struct {
+	Interceptor Interceptor
+}
+
+func (a *Adapter) Default(relativePath string) adapt.Handler {
+	return nil
+}
+
+func (a *Adapter) Adapt(relativePath string, argV interface{}) adapt.Handler {
+	anyF, ok := argV.(*anyF)
+	if !ok {
+		return nil
+	}
+
+	fv := reflect.ValueOf(anyF.F)
+
+	return adapt.HandlerFunc(func(c *gin.Context) {
+		if a.Interceptor != nil {
+			c = a.Interceptor.StartRequest(relativePath, c, anyF.Option.Attrs)
+			if c == nil {
+				return
+			}
+
+			defer a.Interceptor.EndRequest()
+		}
+
+		if err := a.internalAdapter(c, fv, anyF); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error: %s", err))
+		}
+	})
 }
 
 func NewAdapter() *Adapter {
@@ -40,50 +76,73 @@ type AfterFn func(args []interface{}, results []interface{}) error
 
 func (b AfterFn) Do(args []interface{}, results []interface{}) error { return b(args, results) }
 
-type AnyF struct {
+type anyF struct {
+	P      *Adapter
 	F      interface{}
+	Option *Option
+}
+
+func (a *anyF) Parent() adapt.Adapter { return a.P }
+
+type Option struct {
 	Before Before
 	After  After
+	Attrs  map[string]interface{}
 }
 
-func F(v interface{}) *AnyF {
-	return &AnyF{F: v}
+type OptionFn func(*Option)
+
+func (a *Adapter) Before(before Before) OptionFn {
+	return func(f *Option) {
+		f.Before = before
+	}
 }
 
-func F3(v interface{}, before Before, after After) *AnyF {
-	return &AnyF{F: v, Before: before, After: after}
+func (a *Adapter) After(after After) OptionFn {
+	return func(f *Option) {
+		f.After = after
+	}
 }
 
-var AnyFType = reflect.TypeOf((*AnyF)(nil))
-
-func (a *Adapter) Support(relativePath string, arg interface{}) bool {
-	return reflect.TypeOf(arg) == AnyFType
-}
-
-func (a *Adapter) Adapt(relativePath string, argV interface{}) gin.HandlerFunc {
-	anyF := argV.(*AnyF)
-	fv := reflect.ValueOf(anyF.F)
-
-	return func(c *gin.Context) {
-		if err := a.internalAdapter(c, fv, anyF); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("error: %s", err))
+func (a *Adapter) AttrMap(attrs map[string]interface{}) OptionFn {
+	return func(f *Option) {
+		for k, v := range attrs {
+			f.Attrs[k] = v
 		}
 	}
 }
 
-func (a *Adapter) internalAdapter(c *gin.Context, fv reflect.Value, anyF *AnyF) error {
+func (a *Adapter) Attr(k string, v interface{}) OptionFn {
+	return func(f *Option) {
+		f.Attrs[k] = v
+	}
+}
+
+func (a *Adapter) F(v interface{}, fns ...OptionFn) *anyF {
+	option := &Option{
+		Attrs: make(map[string]interface{}),
+	}
+
+	for _, fn := range fns {
+		fn(option)
+	}
+
+	return &anyF{F: v, Option: option}
+}
+
+func (a *Adapter) internalAdapter(c *gin.Context, fv reflect.Value, anyF *anyF) error {
 	argVs, err := a.createArgs(c, fv)
 	if err != nil {
 		return err
 	}
 
-	if err := a.before(argVs, anyF.Before); err != nil {
+	if err := a.before(argVs, anyF.Option.Before); err != nil {
 		return err
 	}
 
 	r := fv.Call(argVs)
 
-	if err := a.after(argVs, r, anyF.After); err != nil {
+	if err := a.after(argVs, r, anyF.Option.After); err != nil {
 		return err
 	}
 

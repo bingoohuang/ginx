@@ -9,8 +9,12 @@ import (
 )
 
 type Adapter interface {
-	Support(relativePath string, arg interface{}) bool
-	Adapt(relativePath string, arg interface{}) gin.HandlerFunc
+	Adapt(relativePath string, arg interface{}) Handler
+	Default(relativePath string) Handler
+}
+
+type Parent interface {
+	Parent() Adapter
 }
 
 type Adaptee struct {
@@ -28,67 +32,144 @@ type Gin interface {
 	http.Handler
 }
 
+// Handler defines the handler used by gin middleware as return value.
+type Handler interface {
+	Handle(*gin.Context)
+}
+
+type Handlers []Handler
+
+func (h Handlers) Handle(c *gin.Context) {
+	for _, e := range h {
+		if e != nil {
+			e.Handle(c)
+		}
+	}
+}
+
+type HandlerFunc gin.HandlerFunc
+
+func (h HandlerFunc) Handle(c *gin.Context) { h(c) }
+
+type Middleware interface {
+	Before(c *gin.Context) (after Handler)
+}
+
+type Middlewares []Middleware
+
+func (s Middlewares) Before(c *gin.Context) (after Handler) {
+	afters := make([]Handler, len(s))
+	for i, m := range s {
+		afters[i] = m.Before(c)
+	}
+
+	return Handlers(afters)
+}
+
 func (i *adapterFuncItem) invoke(adapteeFn interface{}) gin.HandlerFunc {
 	args := []reflect.Value{reflect.ValueOf(adapteeFn)}
 	result := i.adapterFunc.Call(args)
 	return result[0].Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)
 }
 
-func (a *Adaptee) createHandlerFuncs(relativePath string, args []interface{}) []gin.HandlerFunc {
-	hfs := make([]gin.HandlerFunc, 0, len(args))
+func (a *Adaptee) createHandlerFuncs(relativePath string, args []interface{}) gin.HandlerFunc {
+	adapterUnused := make(map[Adapter]bool)
+	for _, ad := range a.adapters {
+		adapterUnused[ad] = true
+	}
+
+	hfs := make([]Handler, 0, len(args))
+	middlewares := make([]Middleware, 0, len(a.adapters))
 
 	for _, arg := range args {
-		if hf := a.adapt(relativePath, arg); hf != nil {
+		hf, ms := a.adapt(relativePath, arg, adapterUnused)
+		if hf != nil {
 			hfs = append(hfs, hf)
+		}
+
+		if len(ms) > 0 {
+			middlewares = append(middlewares, ms...)
 		}
 	}
 
-	return hfs
-}
+	for k := range adapterUnused {
+		f := k.Default(relativePath)
+		if f == nil {
+			continue
+		}
 
-func (a *Adaptee) adapt(relativePath string, arg interface{}) gin.HandlerFunc {
-	if f := a.findAdapterFunc(arg); f != nil {
-		return f
+		if m, ok := f.(Middleware); ok {
+			middlewares = append(middlewares, m)
+		}
+
+		hfs = append(hfs, f)
 	}
 
-	if f := a.findAdapter(relativePath, arg); f != nil {
-		return f
+	return func(c *gin.Context) {
+		defer Middlewares(middlewares).Before(c).Handle(c)
+
+		Handlers(hfs).Handle(c)
+	}
+}
+
+func (a *Adaptee) adapt(relativePath string, arg interface{}, adapterUnused map[Adapter]bool) (Handler, Middlewares) {
+	if arg == nil {
+		return nil, nil
 	}
 
 	if v := reflect.ValueOf(arg); v.Type().ConvertibleTo(GinHandlerFuncType) {
-		return v.Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)
+		return HandlerFunc(v.Convert(GinHandlerFuncType).Interface().(gin.HandlerFunc)), nil
 	}
 
-	return nil
+	if f := a.findAdapterFunc(arg); f != nil {
+		return f, nil
+	}
+
+	return a.findAdapter(relativePath, arg, adapterUnused)
 }
 
-func (a *Adaptee) findAdapterFunc(arg interface{}) gin.HandlerFunc {
+func (a *Adaptee) findAdapterFunc(arg interface{}) HandlerFunc {
 	argType := reflect.TypeOf(arg)
 
 	for funcType, funcItem := range a.adapterFuncs {
 		if argType.ConvertibleTo(funcType) {
-			return funcItem.invoke(arg)
+			return HandlerFunc(funcItem.invoke(arg))
 		}
 	}
 
 	return nil
 }
 
-func (a *Adaptee) findAdapter(relativePath string, arg interface{}) gin.HandlerFunc {
+func (a *Adaptee) findAdapter(relativePath string, arg interface{}, adapterUnused map[Adapter]bool) (HandlerFunc, Middlewares) {
+	chain := make([]Handler, 0, len(a.adapters))
+	middlewares := make([]Middleware, 0, len(a.adapters))
+
 	for _, v := range a.adapters {
-		if v.Support(relativePath, arg) {
-			return v.Adapt(relativePath, arg)
+		if f := v.Adapt(relativePath, arg); f != nil {
+			delete(adapterUnused, v)
+
+			if m, ok := f.(Middleware); ok {
+				middlewares = append(middlewares, m)
+			}
+
+			chain = append(chain, f)
 		}
 	}
 
-	return nil
+	return Handlers(chain).Handle, middlewares
 }
 
-func Adapt(router *gin.Engine) *Adaptee {
-	return &Adaptee{
+func Adapt(router *gin.Engine, adapters ...interface{}) *Adaptee {
+	a := &Adaptee{
 		Router:       router,
 		adapterFuncs: make(map[reflect.Type]*adapterFuncItem),
 	}
+
+	for _, adapt := range adapters {
+		a.RegisterAdapter(adapt)
+	}
+
+	return a
 }
 
 func (a *Adaptee) ServeHTTP(r http.ResponseWriter, w *http.Request) {
@@ -128,39 +209,39 @@ func (a *Adaptee) Use(f func(c *gin.Context)) {
 }
 
 func (a *Adaptee) Any(relativePath string, args ...interface{}) {
-	a.Router.Any(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.Any(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) POST(relativePath string, args ...interface{}) {
-	a.Router.POST(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.POST(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) GET(relativePath string, args ...interface{}) {
-	a.Router.GET(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.GET(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) DELETE(relativePath string, args ...interface{}) {
-	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) PUT(relativePath string, args ...interface{}) {
-	a.Router.PUT(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.PUT(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) PATCH(relativePath string, args ...interface{}) {
-	a.Router.PATCH(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.PATCH(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) OPTIONS(relativePath string, args ...interface{}) {
-	a.Router.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) HEAD(relativePath string, args ...interface{}) {
-	a.Router.HEAD(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.HEAD(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *Adaptee) Group(relativePath string, args ...interface{}) *AdapteeGroup {
-	g := a.Router.Group(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	g := a.Router.Group(relativePath, a.createHandlerFuncs(relativePath, args))
 	return &AdapteeGroup{
 		Adaptee:     a,
 		RouterGroup: g,
@@ -177,33 +258,33 @@ func (a *AdapteeGroup) Use(f func(c *gin.Context)) {
 }
 
 func (a *AdapteeGroup) Any(relativePath string, args ...interface{}) {
-	a.RouterGroup.Any(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.Any(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) POST(relativePath string, args ...interface{}) {
-	a.RouterGroup.POST(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.POST(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) GET(relativePath string, args ...interface{}) {
-	a.RouterGroup.GET(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.GET(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) DELETE(relativePath string, args ...interface{}) {
-	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.Router.DELETE(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) PUT(relativePath string, args ...interface{}) {
-	a.RouterGroup.PUT(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.PUT(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) PATCH(relativePath string, args ...interface{}) {
-	a.RouterGroup.PATCH(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.PATCH(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) OPTIONS(relativePath string, args ...interface{}) {
-	a.RouterGroup.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.OPTIONS(relativePath, a.createHandlerFuncs(relativePath, args))
 }
 
 func (a *AdapteeGroup) HEAD(relativePath string, args ...interface{}) {
-	a.RouterGroup.HEAD(relativePath, a.createHandlerFuncs(relativePath, args)...)
+	a.RouterGroup.HEAD(relativePath, a.createHandlerFuncs(relativePath, args))
 }
