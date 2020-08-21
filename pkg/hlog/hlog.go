@@ -1,7 +1,7 @@
 package hlog
 
 import (
-	"net/http/httptest"
+	"bytes"
 	"time"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
@@ -29,6 +29,29 @@ type Middle struct {
 
 func (m *Middle) Handle(c *gin.Context) {}
 
+type writer struct {
+	gin.ResponseWriter
+	buf bytes.Buffer
+}
+
+func (w *writer) Write(data []byte) (n int, err error) {
+	w.buf.Write(data)
+	return w.ResponseWriter.Write(data)
+}
+
+func (w *writer) WriteString(s string) (n int, err error) {
+	w.buf.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
+}
+
+func (w *writer) Body(maxSize int) string {
+	if w.ResponseWriter.Size() <= maxSize {
+		return w.buf.String()
+	}
+
+	return string(w.buf.Bytes()[:maxSize-3]) + "..."
+}
+
 func (m *Middle) Before(c *gin.Context) (after adapt.Handler) {
 	if m.P.Store == nil || m.hlog.Option.Ignore {
 		return nil
@@ -55,23 +78,19 @@ func (m *Middle) Before(c *gin.Context) (after adapt.Handler) {
 	newCtx, ctxVar := createCtx(r, l)
 	c.Request = c.Request.WithContext(newCtx)
 
-	rec := httptest.NewRecorder()
-
-	ginWriter := c.Writer
+	copyWriter := &writer{
+		ResponseWriter: c.Writer,
+	}
+	c.Writer = copyWriter
 	l.Start = time.Now()
 
 	return adapt.HandlerFunc(func(c *gin.Context) {
 		l.End = time.Now()
 		l.Duration = l.End.Sub(l.Start)
-		l.RspStatus = rec.Code
-		l.RespSize = rec.Body.Len()
-		if l.RespSize <= maxSize {
-			l.RspBody = rec.Body.String()
-		} else {
-			l.RspBody = string(rec.Body.Bytes()[:maxSize-3]) + "..."
-		}
-
-		l.RspHeader = ginWriter.Header()
+		l.RspStatus = copyWriter.Status()
+		l.RespSize = copyWriter.Size()
+		l.RspBody = copyWriter.Body(maxSize)
+		l.RspHeader = copyWriter.Header()
 		l.Attrs = ctxVar.Attrs
 
 		m.P.Store.Store(l)
