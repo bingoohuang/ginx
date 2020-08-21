@@ -1,8 +1,7 @@
 package anyfn
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/sirupsen/logrus"
 	"reflect"
 
 	"github.com/bingoohuang/ginx/pkg/adapt"
@@ -10,23 +9,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdapterDealer is the dealer for a specified type.
-type AdapterDealer interface {
+// DirectDealer is the dealer for a specified type.
+type DirectDealer interface {
 	Deal(*gin.Context)
 }
 
-type Interceptor interface {
-	StartRequest(path string, c *gin.Context, attrs map[string]interface{}) *gin.Context
-	EndRequest()
+// HTTPStatus defines the type of HTTP state.
+type HTTPStatus int
+
+func (h HTTPStatus) Deal(c *gin.Context) {
+	c.Status(int(h))
 }
 
 type Adapter struct {
-	Interceptor Interceptor
+	InSupports  []InSupport
+	OutSupports []OutSupport
 }
 
-func (a *Adapter) Default(relativePath string) adapt.Handler {
-	return nil
-}
+func (a *Adapter) Default(relativePath string) adapt.Handler { return nil }
 
 func (a *Adapter) Adapt(relativePath string, argV interface{}) adapt.Handler {
 	anyF, ok := argV.(*anyF)
@@ -37,23 +37,28 @@ func (a *Adapter) Adapt(relativePath string, argV interface{}) adapt.Handler {
 	fv := reflect.ValueOf(anyF.F)
 
 	return adapt.HandlerFunc(func(c *gin.Context) {
-		if a.Interceptor != nil {
-			c = a.Interceptor.StartRequest(relativePath, c, anyF.Option.Attrs)
-			if c == nil {
-				return
-			}
-
-			defer a.Interceptor.EndRequest()
-		}
-
 		if err := a.internalAdapter(c, fv, anyF); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("error: %s", err))
+			logrus.Warnf("adapt error %v", err)
 		}
 	})
 }
 
 func NewAdapter() *Adapter {
-	adapter := &Adapter{}
+	adapter := &Adapter{
+		InSupports: []InSupport{
+			InSupportFn(GinContextSupport),
+			InSupportFn(HTTPRequestSupport),
+			InSupportFn(HTTPResponseWriterSupport),
+			InSupportFn(ContextKeyValuesSupport),
+			InSupportFn(SinglePrimitiveValueSupport), //  try single param
+			InSupportFn(BindSupport),                 //  try bind
+		},
+		OutSupports: []OutSupport{
+			OutSupportFn(ErrorSupport),
+			OutSupportFn(DirectDealerSupport),
+			OutSupportFn(DefaultSupport),
+		},
+	}
 
 	return adapter
 }
@@ -177,79 +182,37 @@ func (v Values) Interface() []interface{} {
 }
 
 func (a *Adapter) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value) error {
-	ft := fv.Type()
-	numOut := ft.NumOut()
+	numOut := fv.Type().NumOut()
 
-	if numOut == 0 {
-		return nil
+	vs := make([]interface{}, 0, numOut)
+	for i := 0; i < numOut; i++ {
+		vs = append(vs, r[i].Interface())
 	}
 
-	if AsError(ft.Out(numOut - 1)) { // nolint:gomnd
-		if !r[numOut-1].IsNil() {
-			return r[numOut-1].Interface().(error)
-		}
-
-		numOut-- // drop the error returned by the adapted.
+	for _, v := range vs {
+		a.processOutV(c, v, vs)
 	}
-
-	a.succProcess(c, numOut, r)
 
 	return nil
 }
 
-func (a *Adapter) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
-	vs := make([]interface{}, numOut)
-
-	for i := 0; i < numOut; i++ {
-		vs[i] = r[i].Interface()
-		if v, ok := vs[i].(AdapterDealer); ok {
-			v.Deal(c)
-			return
+func (a *Adapter) processOutV(c *gin.Context, v interface{}, vs []interface{}) bool {
+	for _, support := range a.OutSupports {
+		if ok, _ := support.Support(v, vs, c); ok {
+			return ok
 		}
 	}
 
-	succProcessorInternal(c, vs...)
-}
-
-func succProcessorInternal(g *gin.Context, vs ...interface{}) {
-	code, vs := findStateCode(vs)
-
-	if len(vs) == 0 {
-		g.Status(code)
-		return
-	}
-
-	if len(vs) == 1 {
-		respondOut1(g, vs, code)
-		return
-	}
-
-	m := make(map[string]interface{})
-
-	for _, v := range vs {
-		m[reflect.TypeOf(v).String()] = v
-	}
-
-	g.JSON(code, m)
-}
-
-func respondOut1(g *gin.Context, vs []interface{}, code int) {
-	switch v0 := vs[0]; reflect.Indirect(reflect.ValueOf(v0)).Kind() {
-	case reflect.Struct, reflect.Map:
-		g.JSON(code, v0)
-	default:
-		g.String(code, "%v", v0)
-	}
+	return false
 }
 
 func (a *Adapter) createArgs(c *gin.Context, fv reflect.Value) (v []reflect.Value, err error) {
 	ft := fv.Type()
 	argIns := parseArgIns(ft)
 	v = make([]reflect.Value, ft.NumIn())
-	singleArgValue := singlePrimitiveValue(c, argIns)
 
 	for i, arg := range argIns {
-		if v[i], err = a.createArgValue(c, arg, singleArgValue); err != nil {
+		if v[i], err = a.createArgValue(c, arg, argIns); err != nil {
 			return nil, err
 		}
 	}
@@ -257,57 +220,14 @@ func (a *Adapter) createArgs(c *gin.Context, fv reflect.Value) (v []reflect.Valu
 	return v, err
 }
 
-func (a *Adapter) createArgValue(c *gin.Context, arg argIn, singleArgValue string) (reflect.Value, error) {
-	switch arg.Kind {
-	case reflect.Struct:
-		v, err := a.processStruct(c, arg)
-		if err != nil {
-			return reflect.Value{}, err
+func (a *Adapter) createArgValue(c *gin.Context, arg ArgIn, argsIn []ArgIn) (reflect.Value, error) {
+	for _, support := range a.InSupports {
+		v, err := support.Support(arg, argsIn, c)
+		if err == nil && v.IsValid() {
+			return v, nil
 		}
 
-		return ConvertPtr(arg.Ptr, v), nil
-	case reflect.Interface:
-		if arg.Type == HTTPResponseWriterType {
-			return reflect.ValueOf(c.Writer), nil
-		}
-	}
-
-	if arg.PrimitiveIndex < 0 {
-		return reflect.Value{}, fmt.Errorf("unable to parse arg%d for %s", arg.Index, arg.Type)
-	}
-
-	if singleArgValue != "" {
-		return arg.convertValue(singleArgValue)
 	}
 
 	return reflect.Zero(arg.Type), nil
-}
-
-var (
-	GinContextType         = reflect.TypeOf((*gin.Context)(nil)).Elem()
-	HTTPRequestType        = reflect.TypeOf((*http.Request)(nil)).Elem()
-	HTTPResponseWriterType = reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
-)
-
-func (a *Adapter) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
-	if arg.Ptr && arg.Type == GinContextType { // 直接注入gin.Context
-		return reflect.ValueOf(c), nil
-	}
-
-	if arg.Ptr && arg.Type == HTTPRequestType {
-		return reflect.ValueOf(c.Request), nil
-	}
-
-	for _, v := range c.Keys {
-		if arg.Type == NonPtrTypeOf(v) {
-			return reflect.ValueOf(v), nil
-		}
-	}
-
-	argValue := reflect.New(arg.Type)
-	if err := c.ShouldBind(argValue.Interface()); err != nil {
-		return reflect.Value{}, &AdapterError{Err: err, Context: "ShouldBind"}
-	}
-
-	return argValue, nil
 }

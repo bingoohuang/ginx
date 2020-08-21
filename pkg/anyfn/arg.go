@@ -7,17 +7,16 @@ import (
 	"github.com/bingoohuang/ginx/pkg/cast"
 )
 
-type argIn struct {
-	Index          int
-	Type           reflect.Type
-	Kind           reflect.Kind
-	Ptr            bool
-	PrimitiveIndex int
+type ArgIn struct {
+	Index int
+	Type  reflect.Type
+	Kind  reflect.Kind
+	Ptr   bool
 }
 
-func parseArgIns(ft reflect.Type) []argIn {
+func parseArgIns(ft reflect.Type) []ArgIn {
 	numIn := ft.NumIn()
-	argIns := make([]argIn, numIn)
+	argIns := make([]ArgIn, numIn)
 
 	for i := 0; i < numIn; i++ {
 		argIns[i] = parseArgs(ft, i)
@@ -26,7 +25,7 @@ func parseArgIns(ft reflect.Type) []argIn {
 	return argIns
 }
 
-func parseArgs(ft reflect.Type, argIndex int) argIn {
+func parseArgs(ft reflect.Type, argIndex int) ArgIn {
 	argType := ft.In(argIndex)
 	ptr := argType.Kind() == reflect.Ptr
 
@@ -34,10 +33,10 @@ func parseArgs(ft reflect.Type, argIndex int) argIn {
 		argType = argType.Elem()
 	}
 
-	return argIn{Index: argIndex, Type: argType, Kind: argType.Kind(), Ptr: ptr, PrimitiveIndex: -1}
+	return ArgIn{Index: argIndex, Type: argType, Kind: argType.Kind(), Ptr: ptr}
 }
 
-func (arg argIn) convertValue(s string) (reflect.Value, error) {
+func (arg ArgIn) convertValue(s string) (reflect.Value, error) {
 	v, err := cast.To(s, arg.Type)
 	if err != nil {
 		return reflect.Value{}, &AdapterError{

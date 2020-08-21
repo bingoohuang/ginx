@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func singlePrimitiveValue(c *gin.Context, argIns []argIn) string {
+func singlePrimitiveValue(c *gin.Context, argIns []ArgIn) string {
 	if countPrimitiveArgs(argIns) != 1 { // nolint:gomnd
 		return ""
 	}
@@ -25,17 +25,16 @@ func singlePrimitiveValue(c *gin.Context, argIns []argIn) string {
 	return ""
 }
 
-func countPrimitiveArgs(argIns []argIn) int {
+func countPrimitiveArgs(argIns []ArgIn) int {
 	primitiveArgsNum := 0
 
-	for i, arg := range argIns {
+	for _, arg := range argIns {
 		switch arg.Kind {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Bool,
 			reflect.String,
 			reflect.Float32, reflect.Float64:
-			argIns[i].PrimitiveIndex = primitiveArgsNum
 			primitiveArgsNum++
 		}
 	}
