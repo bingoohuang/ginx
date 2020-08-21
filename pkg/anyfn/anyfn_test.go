@@ -27,21 +27,14 @@ func TestAnyFn(t *testing.T) {
 	r.RegisterAdapter(af)
 
 	// This handler will match /user/john but will not match /user/ or /user
-	r.GET("/user/:name", func(name string) string {
-		return fmt.Sprintf("Hello %s", name)
-	})
+	r.GET("/user/:name", func(name string) string { return fmt.Sprintf("Hello %s", name) })
 
 	type MyObject struct {
 		Name string
 	}
 
-	r.POST("/MyObject1", af.F(func(m MyObject) string {
-		return "Object: " + m.Name
-	}))
-
-	r.POST("/MyObject2", af.F(func(m *MyObject) string {
-		return "Object: " + m.Name
-	}))
+	r.POST("/MyObject1", af.F(func(m MyObject) string { return "Object: " + m.Name }))
+	r.POST("/MyObject2", af.F(func(m *MyObject) string { return "Object: " + m.Name }))
 
 	// r.Run(":8080")
 

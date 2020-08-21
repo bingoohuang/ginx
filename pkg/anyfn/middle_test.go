@@ -1,10 +1,12 @@
-package adapt_test
+package anyfn_test
 
 import (
+	"reflect"
 	"testing"
 
-	"github.com/bingoohuang/ginx/pkg/adapt"
 	"github.com/bingoohuang/ginx/pkg/anyfn"
+
+	"github.com/bingoohuang/ginx/pkg/adapt"
 	"github.com/bingoohuang/ginx/pkg/gintest"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +34,22 @@ func TestMiddlewarePtr(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
 	})
+
+	doTest(t, r, af)
+}
+
+func TestInSupport(t *testing.T) {
+	user := AuthUser{Name: "TestAuthUser"}
+	af := anyfn.NewAdapter()
+	af.AddInSupport(anyfn.InSupportFn(func(argIn anyfn.ArgIn, argsIn []anyfn.ArgIn, c *gin.Context) (reflect.Value, error) {
+		if argIn.Type == reflect.TypeOf(AuthUser{}) {
+			return anyfn.ConvertPtr(argIn.Ptr, reflect.ValueOf(user)), nil
+		}
+
+		return reflect.Value{}, nil
+	}))
+
+	r := adapt.Adapt(gin.New(), af)
 
 	doTest(t, r, af)
 }
