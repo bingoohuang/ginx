@@ -56,6 +56,9 @@ func TestNewSQLStore(t *testing.T) {
 	hf := hlog.NewAdapter(hlog.NewSQLStore(db, "biz_log"))
 	r := adapt.Adapt(gin.New(), af, hf)
 	r.Use(ginlogrus.Logger(nil, true))
+	r.Use(func(c *gin.Context) {
+		hlog.PutAttr(c, "age", 5000)
+	})
 
 	r.POST("/hello", af.F(handleIndex), hf.F(hf.Biz("回显处理hlog")))
 	r.POST("/world", af.F(func() string { return "Hello world!" }), hf.F(hf.Biz("世界你好")))
@@ -67,13 +70,13 @@ func TestNewSQLStore(t *testing.T) {
 }
 
 // simplest possible server that returns url as plain text.
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+func handleIndex(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 	// msg := fmt.Sprintf("You've called url %s", r.URL.String())
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK) // 200
 
-	hlog.PutAttr(r, "xxx", "yyy")
-	hlog.PutAttrMap(r, hlog.Attrs{"name": "alice", "female": true})
+	hlog.PutAttr(c, "xxx", "yyy")
+	hlog.PutAttrMap(c, hlog.Attrs{"name": "alice", "female": true})
 
 	var bytes []byte
 

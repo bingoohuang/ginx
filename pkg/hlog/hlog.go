@@ -75,9 +75,6 @@ func (m *Middle) Before(c *gin.Context) (after adapt.Handler) {
 	maxSize := m.hlog.Option.MaxSize
 	l.ReqBody = string(PeekBody(r, maxSize))
 
-	newCtx, ctxVar := createCtx(r, l)
-	c.Request = c.Request.WithContext(newCtx)
-
 	copyWriter := &writer{
 		ResponseWriter: c.Writer,
 	}
@@ -91,7 +88,7 @@ func (m *Middle) Before(c *gin.Context) (after adapt.Handler) {
 		l.RespSize = copyWriter.Size()
 		l.RspBody = copyWriter.Body(maxSize)
 		l.RspHeader = copyWriter.Header()
-		l.Attrs = ctxVar.Attrs
+		l.Attrs = c.Keys
 
 		m.P.Store.Store(l)
 	})
