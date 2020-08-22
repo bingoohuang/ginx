@@ -231,5 +231,5 @@ func main() {
 `httplog:"rsp_json_xxx"`|rsp_json_xxx| 请求体JSON中的xxx属性
 `httplog:"rsp_status"`|rsp_status| 响应编码
 上下文:||
-`httplog:"ctx_xxx"` |ctx_xxx|上下文对象xxx的值, 通过api设置: `httplog.PutAttr(r, "xxx", "yyy")` 或者 `httplog.PutAttrMap(r, httplog.Attrs{"name": "alice", "female": true})`
+`httplog:"ctx_xxx"` |ctx_xxx|上下文对象xxx的值, 通过api设置: `hlog.PutAttr(c, "xxx", "yyy")` 或者 `hlog.PutAttrMap(r, hlog.Attrs{"name": "alice", "female": true}), See [example](pkg/hlog/hlog_test.go#L78)`
 </details>
